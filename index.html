@@ -45,6 +45,11 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:15px/1.
 #legend i{display:inline-block;width:22px;height:0;border-top:3px solid}
 #legend .dot{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid;margin:0 6px 0 5px;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
 .lbl.inf{font-style:italic;color:#444}
+[hidden]{display:none!important}
+.pp table.kv{border-collapse:collapse;margin:4px 0 6px;font-size:13px}
+.pp table.kv th{text-align:left;font-weight:500;color:var(--muted);padding:2px 10px 2px 0;vertical-align:top;white-space:nowrap}
+.pp table.kv td{padding:2px 0}
+.pp .aff{background:var(--chip);border-left:3px solid #ffb300;border-radius:6px;padding:5px 8px;margin:6px 0;font-size:13px}
 #legend .src{margin-top:6px;color:var(--muted);max-width:220px}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--bg);color:var(--fg)}
 .leaflet-popup-content{margin:12px 14px;min-width:220px}
@@ -93,6 +98,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:15px/1.
   <div class="r"><b class="dot" style="background:#fff;border-color:#b0177e"></b>pylône, n° déduit (à vérifier)</div>
   <div class="r"><b class="dot" style="background:#7a7a7a;border-color:#fff"></b>pylône sans n°</div>
   <div class="r"><b class="dot" style="background:#fff;border-color:#b0177e;border-radius:50%;width:13px;height:13px"></b>poste</div>
+  <div class="r" id="legAff" hidden><b class="dot" style="background:#ffb300;border-color:#3b2a00;width:13px;height:13px"></b>pylône d'affaire (hauteur d'étude)</div>
   <div class="src" id="src"></div>
 </details>
 <div id="toast"></div>
@@ -293342,6 +293348,8 @@ const DATA = {"D":"18/11/2026","N":["","Liaison 225 kV n°1 Robinson - Villejust
 ["Villargondran",63,4526592,638161,16,"Savoie (73)"],
 ["Vineuil",90,4757540,137089,0,"Loir-et-Cher (41)"],
 ["Vonnas",63,4622714,499573,16,"Ain (01)"]]};
+// Pylones des etudes d'affaires (version PRIVEE uniquement ; null dans la version publique)
+const AFF = null;
 (function(){
 "use strict";
 const N = DATA.N, O = DATA.O;
@@ -293398,8 +293406,14 @@ map.attributionControl.addAttribution('Réseau © contributeurs OpenStreetMap (O
 map.on('baselayerchange', e=>store('carteHTB.base', e.name));
 map.on('moveend', ()=>{const c=map.getCenter(); store('carteHTB.view',[c.lat,c.lng,map.getZoom()])});
 
-const rLines = L.canvas({padding:0.4, tolerance:6});
-const rPts = L.canvas({padding:0.2, tolerance:8});
+// Un clic sur un objet (pylône, ligne, poste) ne doit pas aussi déclencher « Point choisi »
+let skipMapClick = false;
+function stopMap(e){ L.DomEvent.stopPropagation(e); skipMapClick = false; }
+
+// Un seul calque de dessin pour lignes, pylônes et postes : avec deux calques superposés,
+// celui du dessus interceptait les appuis destinés aux lignes.
+const rLines = L.canvas({padding:0.4, tolerance:7});
+const rPts = rLines;
 
 // ---------- lignes ----------
 const lines = DATA.L.map(r=>{
@@ -293412,7 +293426,7 @@ function lineLabel(l){ return l.name || ('Ligne '+(l.kv?l.kv+' kV ':'')+'(nom no
 lines.forEach((l,i)=>{
   const pl = L.polyline(l.pts, {renderer:rLines, color:color(l.kv), weight:l.kv>=380?3.5:l.kv>=200?3:2.4,
     dashArray:l.cable?'6 5':null, opacity:.9});
-  pl.on('click', e=>{
+  pl.on('click', e=>{ stopMap(e);
     L.popup().setLatLng(e.latlng).setContent(
       '<div class="pp"><h3>'+esc(lineLabel(l))+'</h3>'+
       '<div class="sub">'+(l.kv?l.kv+' kV · ':'')+(l.cable?'souterrain':'aérien')+(l.op?' · '+esc(l.op):'')+'</div>'+
@@ -293438,6 +293452,7 @@ function towerPopup(i){
     (!ref?'<div class="warn">N° non renseigné dans OpenStreetMap</div>':
      inf?'<div class="warn">N° déduit (entre deux n° connus de la ligne) : à vérifier sur place</div>':'')+
     (items.length?'<div class="sub">Ligne'+(items.length>1?'s':'')+' :</div><ul>'+items.join('')+'</ul>':'')+
+    (function(){ const a=nearAff(lat,lon); return a ? '<div class="aff">Étude d\'affaire : pylône '+esc(a[2])+', hauteur <b>'+fmtM(a[4])+'</b>'+(a[3]?' ('+esc(a[3])+')':'')+'<br><span class="sub">'+esc(AFF.A[a[6]])+'</span></div>' : ''; })()+
     navBlock(lat,lon)+'</div>';
 }
 function openTower(i){ const t=T[i]; L.popup().setLatLng([t[0]/1e5,t[1]/1e5]).setContent(towerPopup(i)).openOn(map); }
@@ -293459,7 +293474,7 @@ function drawTowers(){
     const inf=t[2].charAt(0)==='~', ref=inf?t[2].slice(1):t[2];
     L.circleMarker(ll,{renderer:rPts,radius:z>=16?6:4.5,weight:inf?2.5:1.5,color:inf?color(kv):'#fff',
       fillColor:!ref?'#7a7a7a':inf?'#fff':color(kv),fillOpacity:1})
-      .on('click',()=>openTower(i)).addTo(gTow);
+      .on('click',e=>{stopMap(e);openTower(i);}).addTo(gTow);
     if(z>=16 && ref) L.marker(ll,{icon:L.divIcon({className:'lbl'+(inf?' inf':''),html:(inf?'≈':'')+esc(ref),iconSize:null,iconAnchor:[-8,6]}),interactive:false}).addTo(gTowLbl);
     return ++n<5000;
   });
@@ -293473,7 +293488,7 @@ function postePopup(p){
 }
 P.forEach(p=>{
   L.circleMarker([p[2]/1e5,p[3]/1e5],{renderer:rPts,radius:6,weight:2,color:color(p[1]),fillColor:'#fff',fillOpacity:1})
-   .on('click',e=>L.popup().setLatLng(e.latlng).setContent(postePopup(p)).openOn(map)).addTo(gPos);
+   .on('click',e=>{stopMap(e);L.popup().setLatLng(e.latlng).setContent(postePopup(p)).openOn(map);}).addTo(gPos);
 });
 function sizePostes(){ const z=map.getZoom(), r=z<8?2.5:z<11?4:6, w=z<8?1:2; gPos.eachLayer(l=>l.setStyle({radius:r,weight:w})); }
 map.on('zoomend', sizePostes); sizePostes();
@@ -293486,11 +293501,48 @@ function drawPosteLabels(){
     if(++n>300) break; } }
 }
 
+// ---------- pylônes des affaires (version privée) ----------
+// AFF = {A:[affaires], J:[études], R:[[lat5,lon5,"n°","type",hauteur,altitude,iAffaire,iEtude,"notes"]]}
+const gAff = L.layerGroup();
+const affN = AFF ? AFF.R.map(r=>norm(AFF.A[r[6]]+' '+AFF.J[r[7]])) : [];
+const fmtM = v => (v===null||v===undefined||v==='') ? '—' : String(Number(v).toFixed(2)).replace('.',',')+' m';
+function affPopup(r){
+  return '<div class="pp"><h3>Pylône '+esc(r[2])+' · '+fmtM(r[4])+'</h3>'+
+    '<div class="sub">'+esc(AFF.A[r[6]])+'</div>'+
+    '<table class="kv">'+
+      '<tr><th>Hauteur</th><td><b>'+fmtM(r[4])+'</b></td></tr>'+
+      (r[3]?'<tr><th>Type</th><td>'+esc(r[3])+'</td></tr>':'')+
+      (r[5]!==null&&r[5]!==''?'<tr><th>Altitude</th><td>'+fmtM(r[5])+'</td></tr>':'')+
+      (AFF.J[r[7]]?'<tr><th>Étude</th><td>'+esc(AFF.J[r[7]])+'</td></tr>':'')+
+      (r[8]?'<tr><th>Notes</th><td>'+esc(r[8])+'</td></tr>':'')+
+    '</table>'+
+    '<div class="warn">Hauteur issue d\'une étude PLS-CADD (situation parfois projetée) : à confirmer avant commande de nacelle</div>'+
+    navBlock(r[0]/1e5,r[1]/1e5)+'</div>';
+}
+function openAff(i){ const r=AFF.R[i]; L.popup().setLatLng([r[0]/1e5,r[1]/1e5]).setContent(affPopup(r)).openOn(map); }
+if (AFF) {
+  AFF.R.forEach((r,i)=>{
+    L.circleMarker([r[0]/1e5,r[1]/1e5],{renderer:rPts,radius:7,weight:2,color:'#3b2a00',fillColor:'#ffb300',fillOpacity:1})
+      .on('click',e=>{stopMap(e);openAff(i);}).addTo(gAff);
+  });
+  gAff.addTo(map);
+  document.getElementById('legAff').hidden = false;
+  document.title = 'Carte réseau HTB (privée)';
+}
+// hauteur d'étude la plus proche (< 40 m) d'un point, pour la fiche des pylônes OSM
+function nearAff(lat, lon){
+  if(!AFF) return null;
+  let best=null, bd=40;
+  const k=Math.cos(lat*Math.PI/180);
+  for(const r of AFF.R){ const dy=(r[0]/1e5-lat)*111320, dx=(r[1]/1e5-lon)*111320*k, d=Math.sqrt(dx*dx+dy*dy); if(d<bd){bd=d;best=r;} }
+  return best;
+}
+
 // ---------- couches ----------
 const gTowWrap = L.layerGroup(); // case à cocher « Pylônes »
-L.control.layers(bases, {
-  'Lignes aériennes': gAer, 'Lignes souterraines': gSou, 'Pylônes': gTowWrap, 'Postes': gPos
-}, {position:'topright'}).addTo(map);
+const overlays = {'Lignes aériennes': gAer, 'Lignes souterraines': gSou, 'Pylônes': gTowWrap, 'Postes': gPos};
+if (AFF) overlays['Pylônes des affaires (hauteurs)'] = gAff;
+L.control.layers(bases, overlays, {position:'topright'}).addTo(map);
 gTowWrap.addTo(map);
 map.on('overlayadd overlayremove', e=>{ if(e.layer===gTowWrap){towOn=e.type==='overlayadd';drawTowers();} drawPosteLabels(); });
 map.on('moveend', ()=>{drawTowers();drawPosteLabels();});
@@ -293508,7 +293560,7 @@ gpsBtn.onclick=()=>{
     const ll=[p.coords.latitude,p.coords.longitude];
     if(!me){meAcc=L.circle(ll,{radius:p.coords.accuracy,weight:1,color:'#1a73e8',fillOpacity:.12,interactive:false}).addTo(map);
       me=L.circleMarker(ll,{radius:8,weight:3,color:'#fff',fillColor:'#1a73e8',fillOpacity:1}).addTo(map)
-        .on('click',()=>L.popup().setLatLng(me.getLatLng()).setContent('<div class="pp"><h3>Ma position</h3>'+navBlock(me.getLatLng().lat,me.getLatLng().lng)+'</div>').openOn(map));}
+        .on('click',e=>stopMap(e)||L.popup().setLatLng(me.getLatLng()).setContent('<div class="pp"><h3>Ma position</h3>'+navBlock(me.getLatLng().lat,me.getLatLng().lng)+'</div>').openOn(map));}
     else{me.setLatLng(ll);meAcc.setLatLng(ll).setRadius(p.coords.accuracy);}
     if(follow){map.setView(ll,Math.max(map.getZoom(),15));follow=false;}
   },err=>{toast(err.code===1?'Accès à la position refusé':'Position introuvable');gpsBtn.classList.remove('on');
@@ -293551,6 +293603,17 @@ function search(qs){
     if(words.length){ for(let i=0;i<T.length&&n<40;i++) if(test(i)){push(i);n++;} }
     else inView(i=>{ if(test(i)){push(i);n++;} return n<40; });
   }
+  // pylônes des affaires : « breuil 128 », « civrieux 16n »
+  if(AFF && nums.length<=1){
+    let n=0; const num=nums[0];
+    for(let i=0;i<AFF.R.length&&n<20;i++){ const r=AFF.R[i];
+      const ref=norm(r[2]).replace(/^p(?=\d)/,'').replace(/^0+(?=\d)/,'');
+      const numOk = num ? (ref===num || ref.startsWith(num+' ') || ref.startsWith(num+'-')) : false;
+      const refTok = toks.some(t=>!/^\d+[a-z]?$/.test(t) && /\d/.test(t) && ref===t.replace(/^p(?=\d)/,''));
+      if(!(numOk||refTok)) continue;
+      if(!words.filter(w=>!/\d/.test(w)).every(w=>affN[i].includes(w))) continue;
+      results.push({k:'Pylône affaire · hauteur '+fmtM(r[4])+(AFF.J[r[7]]?' · étude '+AFF.J[r[7]]:''),t:r[2]+' · '+AFF.A[r[6]],go:()=>{map.setView([r[0]/1e5,r[1]/1e5],17);setTimeout(()=>openAff(i),250);}}); n++; }
+  }
   if(words.length){
     const all = toks.filter(t=>t.length>0);
     let n=0;
@@ -293568,7 +293631,16 @@ let st; qEl.addEventListener('input',()=>{clearTimeout(st);st=setTimeout(()=>sea
 qEl.addEventListener('keydown',e=>{ if(e.key==='Enter'&&results[0]){results[0].go();resEl.style.display='none';qEl.blur();} if(e.key==='Escape'){resEl.style.display='none';} });
 qEl.addEventListener('focus',()=>{ if(qEl.value.trim().length>=2) search(qEl.value); });
 resEl.addEventListener('click',e=>{const it=e.target.closest('.it'); if(!it)return; results[+it.dataset.i].go(); resEl.style.display='none'; qEl.blur();});
-map.on('click',()=>{resEl.style.display='none';});
+// ---------- itinéraire vers n'importe quel point ----------
+// Un appui sur la carte (hors pylône, ligne, poste) ouvre « Point choisi ».
+// Si une fiche ou la liste de recherche était ouverte, ce premier appui ne fait que la fermer.
+map.on('preclick', ()=>{ skipMapClick = !!(map._popup && map.hasLayer(map._popup)) || resEl.style.display==='block'; });
+map.on('click', e=>{
+  resEl.style.display='none';
+  if(skipMapClick){ skipMapClick=false; return; }
+  L.popup().setLatLng(e.latlng).setContent(
+    '<div class="pp"><h3>Point choisi</h3><div class="sub">Itinéraire vers ce point</div>'+navBlock(e.latlng.lat,e.latlng.lng)+'</div>').openOn(map);
+});
 })();
 </script>
 </body>
