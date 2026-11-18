@@ -77,6 +77,34 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:15px/1.
 @media (min-width:600px){ .leaflet-top.leaflet-right{top:0} }
 #toast{position:absolute;z-index:1100;left:50%;transform:translateX(-50%);bottom:30px;background:#1d232b;color:#fff;padding:8px 14px;border-radius:8px;font-size:14px;display:none}
 @media (min-width:900px){ #top{max-width:520px} }
+/* menu outils */
+#menu{pointer-events:auto;align-self:flex-end;background:var(--bg);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:4px;min-width:220px}
+#menu button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;color:var(--fg);font-size:15px;padding:11px 10px;border-radius:8px;cursor:pointer;text-align:left}
+#menu button:hover,#menu button:focus-visible{background:var(--chip);outline:none}
+/* viseur de mesure */
+#cross{position:absolute;z-index:900;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;pointer-events:none}
+#cross::before,#cross::after{content:"";position:absolute;background:#e3261c;box-shadow:0 0 0 1.5px #fff}
+#cross::before{left:21px;top:0;width:2px;height:44px}
+#cross::after{top:21px;left:0;height:2px;width:44px}
+#cross.snap::before,#cross.snap::after{background:#f08a00}
+#cross.snap{outline:2px solid #f08a00;outline-offset:2px;border-radius:50%}
+#crossLbl{position:absolute;left:30px;top:-22px;white-space:nowrap;font:600 12px system-ui,sans-serif;color:#111;background:#ffd58a;border-radius:6px;padding:2px 6px;display:none}
+#cross.snap #crossLbl{display:block}
+/* panneau de mesure */
+#measure{position:absolute;z-index:1000;left:10px;right:10px;bottom:calc(14px + env(safe-area-inset-bottom,0px));max-width:460px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+#measure .mrow{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+#measure .mk{font-size:12px;color:var(--muted)}
+#measure .mtot{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+#measure .minfo{font-size:13px;color:var(--muted);min-height:18px}
+#measure .minfo b{color:var(--fg)}
+#measure .mbtns{display:flex;gap:6px}
+#measure .mb{flex:1;height:44px;border-radius:9px;border:1px solid var(--line);background:var(--chip);color:var(--fg);font-size:14px;font-weight:600;cursor:pointer}
+#measure .mb.main{flex:1.6;background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+#measure .mx{width:40px;height:40px;border-radius:9px;border:1px solid var(--line);background:var(--chip);color:var(--fg);cursor:pointer;display:flex;align-items:center;justify-content:center}
+body.measuring .leaflet-bottom{bottom:170px}
+body.measuring #legend{display:none}
+.mlbl{background:none;border:0;width:0!important;height:0!important}
+.mlbl span{display:inline-block;transform:translate(-50%,-50%);background:#fff;border:1.5px solid #e3261c;color:#111;font:700 12px system-ui,sans-serif;border-radius:6px;padding:1px 5px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -87,9 +115,33 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:15px/1.
     <button class="btn" id="gps" title="Ma position" aria-label="Ma position">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </button>
+    <button class="btn" id="menuBtn" title="Outils" aria-label="Outils" aria-haspopup="true" aria-expanded="false">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+    </button>
+  </div>
+  <div id="menu" hidden role="menu">
+    <button type="button" role="menuitem" id="mMesure">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>
+      Mesurer une distance
+    </button>
   </div>
   <div id="res"></div>
   <div id="hint"></div>
+</div>
+<div id="cross" hidden aria-hidden="true"><span id="crossLbl"></span></div>
+<div id="measure" hidden>
+  <div class="mrow">
+    <div><div class="mk">Distance totale</div><div class="mtot" id="mTot">0 m</div></div>
+    <button type="button" class="mx" id="mClose" aria-label="Terminer la mesure">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div class="minfo" id="mInfo">Placez le viseur sur le premier point, puis « Ajouter un point ».</div>
+  <div class="mbtns">
+    <button type="button" class="mb main" id="mAdd">Ajouter un point</button>
+    <button type="button" class="mb" id="mUndo">Annuler</button>
+    <button type="button" class="mb" id="mClear">Effacer</button>
+  </div>
 </div>
 <details id="legend">
   <summary>Légende</summary>
@@ -293433,6 +293485,7 @@ lines.forEach((l,i)=>{
   const pl = L.polyline(l.pts, {renderer:rLines, color:color(l.kv), weight:l.kv>=380?3.5:l.kv>=200?3:2.4,
     dashArray:l.cable?'6 5':null, opacity:.9});
   pl.on('click', e=>{ stopMap(e);
+    if(measureOn){ addMeasurePoint(snapAt(e.containerPoint)||{ll:e.latlng,label:''}); return; }
     L.popup().setLatLng(e.latlng).setContent(
       '<div class="pp"><h3>'+esc(lineLabel(l))+'</h3>'+
       '<div class="sub">'+(l.kv?l.kv+' kV · ':'')+(l.cable?'souterrain':'aérien')+(l.op?' · '+esc(l.op):'')+'</div>'+
@@ -293461,7 +293514,7 @@ function towerPopup(i){
     (function(){ const a=nearAff(lat,lon); return a ? '<div class="aff">Étude d\'affaire : pylône '+esc(a[2])+', hauteur <b>'+fmtM(a[4])+'</b>'+(a[3]?' ('+esc(a[3])+')':'')+'<br><span class="sub">'+esc(AFF.A[a[6]])+'</span></div>' : ''; })()+
     navBlock(lat,lon)+'</div>';
 }
-function openTower(i){ const t=T[i]; L.popup().setLatLng([t[0]/1e5,t[1]/1e5]).setContent(towerPopup(i)).openOn(map); }
+function openTower(i){ if(typeof measureOn!=='undefined' && measureOn) return; const t=T[i]; L.popup().setLatLng([t[0]/1e5,t[1]/1e5]).setContent(towerPopup(i)).openOn(map); }
 function inView(fn){
   const b=map.getBounds().pad(0.1);
   const y0=Math.floor(b.getSouth()/CELL), y1=Math.floor(b.getNorth()/CELL), x0=Math.floor(b.getWest()/CELL), x1=Math.floor(b.getEast()/CELL);
@@ -293480,7 +293533,7 @@ function drawTowers(){
     const inf=t[2].charAt(0)==='~', ref=inf?t[2].slice(1):t[2];
     L.circleMarker(ll,{renderer:rPts,radius:z>=16?6:4.5,weight:inf?2.5:1.5,color:inf?color(kv):'#fff',
       fillColor:!ref?'#7a7a7a':inf?'#fff':color(kv),fillOpacity:1})
-      .on('click',e=>{stopMap(e);openTower(i);}).addTo(gTow);
+      .on('click',e=>{stopMap(e); if(measureOn){addMeasurePoint({ll:L.latLng(ll),label:towerLabel(i)});return;} openTower(i);}).addTo(gTow);
     if(z>=16 && ref) L.marker(ll,{icon:L.divIcon({className:'lbl'+(inf?' inf':''),html:(inf?'≈':'')+esc(ref),iconSize:null,iconAnchor:[-8,6]}),interactive:false}).addTo(gTowLbl);
     return ++n<5000;
   });
@@ -293494,7 +293547,7 @@ function postePopup(p){
 }
 P.forEach(p=>{
   L.circleMarker([p[2]/1e5,p[3]/1e5],{renderer:rPts,radius:6,weight:2,color:color(p[1]),fillColor:'#fff',fillOpacity:1})
-   .on('click',e=>{stopMap(e);L.popup().setLatLng(e.latlng).setContent(postePopup(p)).openOn(map);}).addTo(gPos);
+   .on('click',e=>{stopMap(e); if(measureOn){addMeasurePoint({ll:L.latLng(p[2]/1e5,p[3]/1e5),label:'Poste '+(p[0]||'')});return;} L.popup().setLatLng(e.latlng).setContent(postePopup(p)).openOn(map);}).addTo(gPos);
 });
 function sizePostes(){ const z=map.getZoom(), r=z<8?2.5:z<11?4:6, w=z<8?1:2; gPos.eachLayer(l=>l.setStyle({radius:r,weight:w})); }
 map.on('zoomend', sizePostes); sizePostes();
@@ -293525,11 +293578,11 @@ function affPopup(r){
     '<div class="warn">Hauteur issue d\'une étude PLS-CADD (situation parfois projetée) : à confirmer avant commande de nacelle</div>'+
     navBlock(r[0]/1e5,r[1]/1e5)+'</div>';
 }
-function openAff(i){ const r=AFF.R[i]; L.popup().setLatLng([r[0]/1e5,r[1]/1e5]).setContent(affPopup(r)).openOn(map); }
+function openAff(i){ if(typeof measureOn!=='undefined' && measureOn) return; const r=AFF.R[i]; L.popup().setLatLng([r[0]/1e5,r[1]/1e5]).setContent(affPopup(r)).openOn(map); }
 if (AFF) {
   AFF.R.forEach((r,i)=>{
     L.circleMarker([r[0]/1e5,r[1]/1e5],{renderer:rPts,radius:7,weight:2,color:'#3b2a00',fillColor:'#ffb300',fillOpacity:1})
-      .on('click',e=>{stopMap(e);openAff(i);}).addTo(gAff);
+      .on('click',e=>{stopMap(e); if(measureOn){addMeasurePoint({ll:L.latLng(r[0]/1e5,r[1]/1e5),label:'P'+r[2]});return;} openAff(i);}).addTo(gAff);
   });
   gAff.addTo(map);
   document.getElementById('legAff').hidden = false;
@@ -293624,7 +293677,7 @@ function search(qs){
     const all = toks.filter(t=>t.length>0);
     let n=0;
     for(let i=0;i<P.length&&n<15;i++) if(posteN[i] && all.every(w=>posteN[i].includes(w))){ const p=P[i];
-      results.push({k:'Poste'+(p[1]?' '+p[1]+' kV':''),t:p[0],go:()=>{map.setView([p[2]/1e5,p[3]/1e5],15);setTimeout(()=>L.popup().setLatLng([p[2]/1e5,p[3]/1e5]).setContent(postePopup(p)).openOn(map),250);}}); n++; }
+      results.push({k:'Poste'+(p[1]?' '+p[1]+' kV':''),t:p[0],go:()=>{map.setView([p[2]/1e5,p[3]/1e5],15);if(!measureOn)setTimeout(()=>L.popup().setLatLng([p[2]/1e5,p[3]/1e5]).setContent(postePopup(p)).openOn(map),250);}}); n++; }
     n=0;
     for(const g of lineNames.values()){ if(n>=25) break; if(all.every(w=>g.n.includes(w))||words.every(w=>g.n.includes(w))&&!nums.length){
       results.push({k:'Ligne'+(g.kvs.size?' '+[...g.kvs].join('/')+' kV':'')+' · '+g.idx.length+' tronçon'+(g.idx.length>1?'s':''),t:g.name,go:()=>highlight(g.idx)}); n++; } }
@@ -293643,10 +293696,97 @@ resEl.addEventListener('click',e=>{const it=e.target.closest('.it'); if(!it)retu
 map.on('preclick', ()=>{ skipMapClick = !!(map._popup && map.hasLayer(map._popup)) || resEl.style.display==='block'; });
 map.on('click', e=>{
   resEl.style.display='none';
+  if(measureOn){ skipMapClick=false; addMeasurePoint(snapAt(e.containerPoint)||{ll:e.latlng,label:''}); return; }
   if(skipMapClick){ skipMapClick=false; return; }
   L.popup().setLatLng(e.latlng).setContent(
     '<div class="pp"><h3>Point choisi</h3><div class="sub">Itinéraire vers ce point</div>'+navBlock(e.latlng.lat,e.latlng.lng)+'</div>').openOn(map);
 });
+
+// ---------- menu « ⋯ » ----------
+const menuBtn=document.getElementById('menuBtn'), menuEl=document.getElementById('menu');
+function closeMenu(){ menuEl.hidden=true; menuBtn.setAttribute('aria-expanded','false'); }
+menuBtn.onclick=ev=>{ ev.stopPropagation(); menuEl.hidden=!menuEl.hidden; menuBtn.setAttribute('aria-expanded', String(!menuEl.hidden)); };
+document.addEventListener('click', ev=>{ if(!menuEl.hidden && !menuEl.contains(ev.target) && ev.target!==menuBtn) closeMenu(); });
+document.getElementById('mMesure').onclick=()=>{ closeMenu(); startMeasure(); };
+
+// ---------- mesure de distance ----------
+// Viseur au centre : on déplace la carte, « Ajouter un point ». Le viseur s'aimante sur le pylône
+// ou le poste le plus proche (zoom >= 13). Un appui sur la carte ou sur un pylône ajoute aussi un point.
+let measureOn=false;
+const mPts=[];                       // {ll: LatLng, label: 'P54' | 'Poste X' | ''}
+const gMeas=L.layerGroup().addTo(map);
+let mPreview=null, mSnap=null;
+const crossEl=document.getElementById('cross'), crossLbl=document.getElementById('crossLbl');
+const mTot=document.getElementById('mTot'), mInfo=document.getElementById('mInfo');
+const fmtD=m=> m<1000 ? Math.round(m)+' m' : (m/1000).toFixed(2).replace('.',',')+' km';
+function towerLabel(i){ const r=T[i][2]; if(!r) return 'pylône'; return r.charAt(0)==='~' ? 'P≈'+r.slice(1) : 'P'+r; }
+function snapAt(cp){
+  if(map.getZoom()<13) return null;
+  let best=null, bd=24;
+  const test=(ll,label)=>{ const d=map.latLngToContainerPoint(ll).distanceTo(cp); if(d<bd){ bd=d; best={ll:L.latLng(ll),label}; } };
+  if(towOn) inView(i=>{ const t=T[i]; test([t[0]/1e5,t[1]/1e5], towerLabel(i)); });
+  if(AFF && map.hasLayer(gAff)) AFF.R.forEach(r=>test([r[0]/1e5,r[1]/1e5],'P'+r[2]));
+  if(map.hasLayer(gPos)) { const b=map.getBounds(); P.forEach(p=>{ if(b.contains([p[2]/1e5,p[3]/1e5])) test([p[2]/1e5,p[3]/1e5],'Poste '+(p[0]||'')); }); }
+  return best;
+}
+function total(){ let s=0; for(let i=1;i<mPts.length;i++) s+=map.distance(mPts[i-1].ll,mPts[i].ll); return s; }
+function drawMeasure(){
+  gMeas.clearLayers();
+  if(mPts.length>1) L.polyline(mPts.map(p=>p.ll),{renderer:rLines,color:'#e3261c',weight:3.5,interactive:false}).addTo(gMeas);
+  for(let i=1;i<mPts.length;i++){
+    const a=mPts[i-1].ll, b=mPts[i].ll, mid=L.latLng((a.lat+b.lat)/2,(a.lng+b.lng)/2);
+    L.marker(mid,{icon:L.divIcon({className:'mlbl',html:'<span>'+fmtD(map.distance(a,b))+'</span>',iconSize:null}),interactive:false}).addTo(gMeas);
+  }
+  mPts.forEach((p,i)=>L.circleMarker(p.ll,{renderer:rLines,radius:6,weight:2.5,color:'#e3261c',fillColor:'#fff',fillOpacity:1,interactive:false}).addTo(gMeas));
+  mTot.textContent=fmtD(total());
+  updatePreview();
+}
+function updatePreview(){
+  if(!measureOn) return;
+  const c=map.getSize().divideBy(2);
+  mSnap=snapAt(c);
+  crossEl.classList.toggle('snap', !!mSnap);
+  crossLbl.textContent = mSnap ? mSnap.label : '';
+  const target = mSnap ? mSnap.ll : map.containerPointToLatLng(c);
+  if(mPreview){ map.removeLayer(mPreview); mPreview=null; }
+  if(mPts.length){
+    const last=mPts[mPts.length-1];
+    mPreview=L.polyline([last.ll,target],{renderer:rLines,color:'#e3261c',weight:2,dashArray:'6 6',opacity:.85,interactive:false}).addTo(map);
+    const d=map.distance(last.ll,target);
+    mInfo.innerHTML='Jusqu\'au viseur : <b>+ '+fmtD(d)+'</b>'+(mSnap?' ('+esc(mSnap.label)+')':'')+' · total <b>'+fmtD(total()+d)+'</b>';
+  } else {
+    mInfo.textContent = mSnap ? 'Viseur sur '+mSnap.label+' : « Ajouter un point » pour démarrer.' : 'Placez le viseur sur le premier point, puis « Ajouter un point ».';
+  }
+}
+function addMeasurePoint(pt){
+  if(!pt) return;
+  const last=mPts[mPts.length-1];
+  if(last && map.distance(last.ll,pt.ll)<0.5) return;          // même point deux fois
+  mPts.push(pt); drawMeasure();
+  // petite vibration de confirmation (téléphone), seulement après un vrai toucher
+  if(navigator.vibrate && navigator.userActivation && navigator.userActivation.isActive) try{ navigator.vibrate(15); }catch(_){}
+}
+function startMeasure(){
+  if(measureOn) return;
+  measureOn=true; map.closePopup(); resEl.style.display='none';
+  document.body.classList.add('measuring');
+  crossEl.hidden=false; document.getElementById('measure').hidden=false;
+  if(map.getZoom()<13) toast('Zoomez pour viser les pylônes');
+  drawMeasure();
+}
+function stopMeasure(){
+  measureOn=false; mPts.length=0; gMeas.clearLayers();
+  if(mPreview){ map.removeLayer(mPreview); mPreview=null; }
+  document.body.classList.remove('measuring');
+  crossEl.hidden=true; document.getElementById('measure').hidden=true;
+}
+document.getElementById('mAdd').onclick=()=>{ const c=map.getSize().divideBy(2); addMeasurePoint(snapAt(c)||{ll:map.containerPointToLatLng(c),label:''}); };
+document.getElementById('mUndo').onclick=()=>{ mPts.pop(); drawMeasure(); };
+document.getElementById('mClear').onclick=()=>{ mPts.length=0; drawMeasure(); };
+document.getElementById('mClose').onclick=stopMeasure;
+map.on('move', ()=>{ if(measureOn) updatePreview(); });
+map.on('moveend zoomend', ()=>{ if(measureOn) drawMeasure(); });
+document.addEventListener('keydown', ev=>{ if(measureOn && ev.key==='Escape') stopMeasure(); });
 })();
 </script>
 </body>
