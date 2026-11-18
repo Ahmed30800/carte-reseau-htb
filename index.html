@@ -312449,11 +312449,11 @@ L.control.scale({imperial:false, position:'bottomright'}).addTo(map);
 const ign = (layer, fmtImg, nz) => L.tileLayer(
   'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER='+layer+
   '&STYLE=normal&TILEMATRIXSET=PM&FORMAT='+fmtImg+'&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
-  {maxNativeZoom:nz, maxZoom:20, attribution:'© IGN Géoplateforme'});
+  {maxNativeZoom:nz, maxZoom:20, crossOrigin:true, attribution:'© IGN Géoplateforme'});
 const bases = {
   'Plan IGN': ign('GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2','image/png',18),
   'Photos aériennes IGN': ign('ORTHOIMAGERY.ORTHOPHOTOS','image/jpeg',19),
-  'OpenStreetMap': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxNativeZoom:19,maxZoom:20,attribution:'© contributeurs OpenStreetMap'})
+  'OpenStreetMap': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxNativeZoom:19,maxZoom:20,crossOrigin:true,attribution:'© contributeurs OpenStreetMap'})
 };
 const baseName = load('carteHTB.base');
 (bases[baseName] || bases['Plan IGN']).addTo(map);
@@ -312794,6 +312794,15 @@ document.getElementById('mClose').onclick=stopMeasure;
 map.on('move', ()=>{ if(measureOn) updatePreview(); });
 map.on('moveend zoomend', ()=>{ if(measureOn) drawMeasure(); });
 document.addEventListener('keydown', ev=>{ if(measureOn && ev.key==='Escape') stopMeasure(); });
+
+// ---------- mode hors connexion ----------
+// La page et le fond de carte déjà vu sont gardés en mémoire par sw.js (site en ligne uniquement).
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+const offMsg = 'Hors connexion : la carte reste utilisable (fond de carte là où vous êtes déjà passé)';
+window.addEventListener('offline', () => toast(offMsg));
+if (navigator.onLine === false) setTimeout(() => toast(offMsg), 800);
 })();
 </script>
 </body>
